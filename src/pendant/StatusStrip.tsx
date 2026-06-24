@@ -1,15 +1,17 @@
 import { deriveStatus, useMachineStore, type RobotStatus } from '../state/machineStore'
 import { usePendantStore } from '../state/pendantStore'
+import { useProgramStore } from '../state/programStore'
+import { useSettingsStore } from '../state/settingsStore'
 import { StatusPill, type StatusTone } from '../ui/StatusPill'
 
 /**
- * Status strip — Phase 2 · Unit 5.
+ * Status strip — Phase 2 · Unit 5, PROG wired in Phase 4 · Unit 2.
  *
- * The full-width top HUD, now wired live (it was static in Phase 1). Surfaces the
- * active frame and speed override (pendant store) and the robot status pill
- * (machine store), with placeholders for program name (Phase 4) and the
- * connection pill (Offline until Phase 7). Numeric/telemetry text is monospaced
- * per ui-context.md.
+ * The full-width top HUD. Surfaces the active frame and speed override
+ * (pendant store), the active program name (program store; click to open the
+ * editor drawer), the robot status pill (machine store), and a placeholder for
+ * the connection pill (Offline until Phase 7). Numeric/telemetry text is
+ * monospaced per ui-context.md.
  */
 const STATUS_META: Record<RobotStatus, { label: string; tone: StatusTone; pulse?: boolean }> = {
   ready: { label: 'Ready', tone: 'ready' },
@@ -23,6 +25,8 @@ export function StatusStrip() {
   const speedPct = usePendantStore((s) => s.speedPct)
   const status = useMachineStore(deriveStatus)
   const meta = STATUS_META[status]
+  const program = useProgramStore((s) => s.program)
+  const toggleProgramEditor = useSettingsStore((s) => s.toggleProgramEditor)
 
   return (
     <header className="flex h-10 shrink-0 items-center justify-between border-b border-border-default bg-surface px-4">
@@ -38,9 +42,14 @@ export function StatusStrip() {
         <span className="text-muted">
           SPEED <span className="text-primary tabular-nums">{speedPct}%</span>
         </span>
-        <span className="text-muted">
-          PROG <span className="text-faint">(none)</span>
-        </span>
+        <button
+          type="button"
+          onClick={toggleProgramEditor}
+          className="text-muted hover:text-primary"
+          title="Open the program editor"
+        >
+          PROG <span className="text-primary">{program.name}</span>
+        </button>
         <StatusPill label={meta.label} tone={meta.tone} pulse={meta.pulse} />
         <StatusPill label="Offline" tone="offline" />
       </div>

@@ -1,17 +1,18 @@
 import { useMachineStore } from '../state/machineStore'
+import { useProgramStore } from '../state/programStore'
 import { useRobotStore } from '../state/robotStore'
 import { PendantButton } from '../ui/PendantButton'
 
 /**
- * Safety controls — Phase 2 · Unit 4.
+ * Safety controls — Phase 2 · Unit 4, TEACH wired in Phase 4 · Unit 2.
  *
  * TEACH / HOME / HOLD plus the latched E-STOP.
+ *  - TEACH captures the current joint angles (+ FK pose) as a new named
+ *    waypoint in the active program (program store); the editor lists it.
  *  - HOME jogs the arm back to the home pose (blocked while motion is disabled).
  *  - HOLD toggles a motion hold that pauses jogging/playback.
  *  - E-STOP latches: pressing it kills motion and stays engaged until an explicit
  *    Reset (a deliberate two-step, like a real machine — no accidental clear).
- * TEACH records a waypoint; it lands with the offline programmer in Phase 4 and
- * is shown disabled until then.
  */
 export function SafetyControls() {
   const estop = useMachineStore((s) => s.estop)
@@ -19,14 +20,16 @@ export function SafetyControls() {
   const engageEstop = useMachineStore((s) => s.engageEstop)
   const resetEstop = useMachineStore((s) => s.resetEstop)
   const toggleHold = useMachineStore((s) => s.toggleHold)
+  const angles = useRobotStore((s) => s.angles)
   const home = useRobotStore((s) => s.home)
+  const teachWaypoint = useProgramStore((s) => s.teachWaypoint)
 
   const motionEnabled = !estop && !hold
 
   return (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-3 gap-2">
-        <PendantButton disabled title="Teach a waypoint — Phase 4">
+        <PendantButton onClick={() => teachWaypoint(angles)} title="Record the current pose as a waypoint">
           Teach
         </PendantButton>
         <PendantButton disabled={!motionEnabled} onClick={home}>

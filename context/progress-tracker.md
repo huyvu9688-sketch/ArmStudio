@@ -6,7 +6,8 @@ Update this file after every meaningful implementation change.
 
 ## Current Phase
 
-Phase 4 — Offline programmer: **In progress (Unit 1 done).**
+Phase 4 — Offline programmer: **COMPLETE (Units 1–4).** Ready to start
+Phase 5 (3D cell + CAD import) when the user says so.
 
 Phase 3 — IK + Cartesian + linear moves: **COMPLETE (Units 1–6).**
 
@@ -232,6 +233,96 @@ status strip). Phase 1 shipped the GLB arm + scene + forward kinematics.
   no browser-visible change (model only), same precedent as Phase 1 Unit 4
   and Phase 3 Unit 1.
 
+- **Phase 4 · Unit 2 — Program editor + TEACH.** New `src/state/
+  programStore.ts` (zustand wrapper around `instructionModel.ts`'s pure
+  functions — the editor and TEACH call these actions, never the pure
+  functions directly): `teachWaypoint` (captures live joint angles + their FK
+  pose, auto-named P1, P2…), `addMoveJ`/`addMoveL`/`addWait`/
+  `removeInstruction`/`removeWaypoint`/`moveInstruction`. `SafetyControls.tsx`:
+  TEACH is now live (was disabled since Phase 2). New `src/program/
+  ProgramEditor.tsx`: a right-side drawer (ui-context.md) listing the
+  instruction sequence (line numbers, ↑/↓ reorder, × delete) and the taught
+  waypoints (pose preview, +J/+L to append a move, × to delete — cascades to
+  drop instructions referencing it), plus a WAIT seconds input. New moves pick
+  up the pendant's current speed override. Run/Step/Pause/Stop/Loop and
+  Save/Load/.tp are shown disabled (next units), matching the established
+  pattern of shipping future controls visibly-disabled ahead of their unit.
+  `settingsStore` gained `programEditorOpen`/`toggleProgramEditor`; the status
+  strip's PROG indicator is now a live program-name button that opens the
+  drawer. Verified end-to-end in a headless browser (Playwright, temp dev
+  dependency, removed after): open drawer → TEACH twice → add MOVJ/MOVL →
+  reorder → add/delete WAIT, zero console errors, dark-theme styling intact,
+  no overlap with the viewport/pendant. `npm run build` + `npm run lint` +
+  `npm run test` (53 tests) all pass.
+
+- **Phase 4 · Unit 3 — Run/Step/Pause/Stop/Loop playback.** New
+  `src/state/playbackStore.ts` (zustand: `running`, `currentIndex`, `loop`,
+  `lastError`) tracks where playback is in the program, separate from the
+  program's data and from `machineStore`'s safety state. New `src/program/
+  useProgramPlayback.ts` sequences `program.instructions` over the Phase 3
+  `useMotion` engine: MOVJ/MOVL look up their waypoint and call `runMove`
+  (each line's recorded `speedPct` becomes the live pendant speed override
+  for that move, mirroring a real pendant); WAIT runs a cancellable
+  `setTimeout`; CALL has no resolvable target yet (no second program exists)
+  so it logs a warning and advances rather than blocking the sequence.
+  Pause/Stop are *not* a separate motion path — Pause calls the existing
+  `machineStore.setHold(true)` (identical to pressing HOLD) and Stop cancels
+  the in-flight move and rewinds to instruction 0, so E-STOP/HOLD interrupt
+  playback exactly like a jog (architecture invariant unchanged). The
+  recursive step driver is rebuilt in a `useEffect` and invoked through a ref
+  (`executeAtRef`) rather than a self-referencing `useCallback`, to satisfy
+  the repo's `react-hooks/immutability` rule (flags a callback recursing on
+  itself, since the linter can't verify the recursive call sees dependency
+  updates) while still mutating only inside an effect, never during render.
+  `ProgramEditor.tsx`: Run/Step/Pause/Stop/Loop are now live (replacing the
+  Unit 2 disabled placeholders); the active instruction is highlighted amber
+  while running; editing controls (reorder/delete/add move/add wait) lock
+  while a run is in flight to avoid mutating a program mid-playback; a
+  `lastError` banner surfaces typed move failures (out of reach / singular /
+  limit / aborted). Verified in a headless browser: Step executes exactly one
+  line and halts; Run disables Run and re-enables on finish; Pause/Stop drive
+  the same disable/enable transitions; zero console errors. (This specific
+  headless Chromium renders with software GL — console shows GPU-stall
+  warnings — so `requestAnimationFrame` fires irregularly, making "catch a
+  move exactly mid-flight" an unreliable assertion in this environment
+  specifically; the state-machine transitions themselves were confirmed
+  reliably.) `npm run build` + `npm run lint` + `npm run test` (53 tests) all
+  pass.
+
+- **Phase 4 · Unit 4 — Save/Load/.tp export.** New `src/program/migrate.ts`:
+  `migrateProgram(data: unknown): Program` validates a parsed JSON file's
+  shape at the boundary (code-standards.md — a `.json` file is external input
+  and may be hand-edited, corrupt, or from a future format) before trusting
+  it; throws a typed `ProgramMigrationError` rather than returning a half-valid
+  program. Only version 1 exists today, but future format changes add a case
+  here instead of changing `Program` in place. New `src/program/serialize.ts`
+  (pure): `serializeProgram`/`deserializeProgram` (JSON, round-tripped through
+  `migrateProgram`) and `exportTp` — a FANUC-pendant-flavored `.tp` text
+  listing (instructions + `P[]` waypoint poses), write-only documentation
+  (code-standards.md: parsing TP text back in is out of scope). `programStore`
+  gained `loadProgram` (replaces the active program wholesale). `ProgramEditor.tsx`:
+  Save/Load/`.tp` buttons under the program name (matching the ui-context.md
+  mock) — Save and `.tp` trigger a browser file download; Load opens a hidden
+  file picker, parses + migrates the chosen file, and shows a typed error
+  banner (e.g. "unsupported program version") instead of silently failing or
+  crashing on a malformed file; Load is disabled while a run is in flight,
+  consistent with the rest of the editor. Verified in a headless browser:
+  Save produces a downloadable `.json` with the taught waypoint + instruction
+  intact, `.tp` export contains the program name and the MOVJ line, loading
+  that saved file back in reproduces the program, and loading a malformed
+  file surfaces the typed error banner instead of corrupting state — zero
+  console errors throughout. `npm run build` + `npm run lint` + `npm run test`
+  (63 tests, +10) all pass.
+
+**Phase 4 done-when met:** instruction model (MOVJ/MOVL/WAIT/CALL) + teach
+point, editor (add/del/reorder), Run/Step/Pause/Stop/Loop, JSON save/load, and
+`.tp` text export are all shipped and wired into the pendant + program editor
+drawer. Known gaps carried forward: CALL has no resolvable target (no second
+program / program registry exists yet — would need its own unit beyond the
+original Phase 4 plan); the FK↔GLB visual mismatch and joint-jog-direction
+sign-off remain open from earlier phases. Phase 5 (3D cell + CAD import) is
+next when the user says so.
+
 ## What exists after Phase 3 (handoff snapshot)
 
 - **Kinematics** (`src/kinematics/`, pure): `forward` (FK), `dh`, `units`,
@@ -318,13 +409,14 @@ status strip). Phase 1 shipped the GLB arm + scene + forward kinematics.
 
 ## In Progress
 
-- Phase 4 · Unit 1 (instruction model) shipped. Ready to start Phase 4 · Unit 2
-  (program editor UI: add/del/reorder over `instructionModel.ts`, plus a way to
-  teach a `Waypoint` from the current robot/TCP pose) when the user says so.
-  Open: user sign-off on joint jog directions (flip any `sign` in
-  `glb-joint-map.ts`); and the FK↔GLB visual mismatch (trail/TCP marker are in
-  FK/base coords) — a re-rig of the GLB to Link1..Link6 would let FK geometry
-  sit on the mesh.
+- Phase 4 complete (instruction model, program editor + TEACH,
+  Run/Step/Pause/Stop/Loop playback, Save/Load/.tp). Ready to start Phase 5
+  (3D cell + CAD import) when the user says so. Open: user sign-off on joint
+  jog directions (flip any `sign` in `glb-joint-map.ts`); the FK↔GLB visual
+  mismatch (trail/TCP marker are in FK/base coords) — a re-rig of the GLB to
+  Link1..Link6 would let FK geometry sit on the mesh; CALL has no resolvable
+  target (no second program / program registry exists yet — its own unit
+  beyond the original phase plans, whenever multi-program support is wanted).
 
 ---
 

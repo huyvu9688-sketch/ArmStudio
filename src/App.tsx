@@ -3,6 +3,7 @@ import { Viewport } from './scene/Viewport'
 import { ViewportOverlay } from './scene/ViewportOverlay'
 import { Pendant } from './pendant/Pendant'
 import { StatusStrip } from './pendant/StatusStrip'
+import { ProgramEditor } from './program/ProgramEditor'
 
 /**
  * App shell.
@@ -39,6 +40,7 @@ function App() {
             <Viewport />
           </Suspense>
           <ViewportOverlay />
+          <ProgramEditor />
         </main>
 
         {/* Right — teach pendant (Phase 2). */}

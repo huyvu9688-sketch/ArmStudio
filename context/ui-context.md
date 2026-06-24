@@ -173,5 +173,11 @@ the TCP-trail toggle + Clear; the amber trail and blue TCP marker render in the
 viewport. Singularity / out-of-reach / limit conditions read in the safety palette
 (red), consistent with the tokens.
 
-Still pending (later phases): `InstructionRow`, `CellTreeNode`,
-`ObjectPropertyPanel`, `ConnectionPill`; the User frame tab.
+**Added in Phase 4:** `ProgramEditor.tsx` (right-side drawer per the layout
+above) renders the instruction list and waypoint list inline rather than via a
+standalone `InstructionRow` component — kept as plain rows for now since
+Run/Step/Pause/Stop playback (next unit) will likely change each row's shape
+(an active-line highlight). TEACH (`SafetyControls.tsx`) is now live.
+
+Still pending (later phases): `CellTreeNode`, `ObjectPropertyPanel`,
+`ConnectionPill`; the User frame tab.

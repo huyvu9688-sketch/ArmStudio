@@ -14,6 +14,9 @@ interface SettingsStore {
   toggleTrail: () => void
   clearTrailNonce: number
   clearTrail: () => void
+  /** Program editor drawer (ui-context.md: opens as a right-side drawer/overlay). */
+  programEditorOpen: boolean
+  toggleProgramEditor: () => void
 }
 
 export const useSettingsStore = create<SettingsStore>((set) => ({
@@ -22,4 +25,6 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   toggleTrail: () => set((s) => ({ showTrail: !s.showTrail })),
   clearTrailNonce: 0,
   clearTrail: () => set((s) => ({ clearTrailNonce: s.clearTrailNonce + 1 })),
+  programEditorOpen: false,
+  toggleProgramEditor: () => set((s) => ({ programEditorOpen: !s.programEditorOpen })),
 }))
