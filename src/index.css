@@ -1,0 +1,92 @@
+@import 'tailwindcss';
+
+/*
+ * ArmStudio design tokens — single source of truth for color/typography.
+ * Mirrors context/ui-context.md. No component may hardcode a hex value.
+ *
+ * Two surfaces are exposed:
+ *  1. Canonical CSS variables (`--bg-base`, `--text-primary`, …) for direct
+ *     `var(--token)` use, exactly as named in ui-context.md.
+ *  2. Tailwind v4 `@theme` tokens that re-export the same values so utilities
+ *     resolve (`bg-base`, `text-muted`, `border-default`, `font-mono`, …).
+ */
+
+:root {
+  /* Backgrounds */
+  --bg-base: #0f1114;
+  --bg-surface: #181c23;
+  --bg-surface-2: #21262f;
+  --bg-well: #131720;
+
+  /* Borders */
+  --border-default: #2a3040;
+  --border-emphasis: #3d4860;
+
+  /* Text */
+  --text-primary: #e8ecf2;
+  --text-muted: #8a95a8;
+  --text-faint: #586070;
+
+  /* Accents */
+  --accent-amber: #f5a623;
+  --accent-blue: #4a9ee8;
+
+  /* States */
+  --state-ready: #3dbd7a;
+  --state-warning: #f0b429;
+  --state-error: #e8453c;
+  --state-online: #3dbd7a;
+  --state-offline: #586070;
+
+  /* Cell object types */
+  --obj-part: #4a9ee8;
+  --obj-fixture: #8a95a8;
+  --obj-obstacle: #f0b429;
+}
+
+@theme {
+  /* Re-export tokens as Tailwind color utilities (bg-*, text-*, border-*). */
+  --color-base: var(--bg-base);
+  --color-surface: var(--bg-surface);
+  --color-surface-2: var(--bg-surface-2);
+  --color-well: var(--bg-well);
+
+  --color-border-default: var(--border-default);
+  --color-border-emphasis: var(--border-emphasis);
+
+  --color-primary: var(--text-primary);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+
+  --color-amber: var(--accent-amber);
+  --color-blue: var(--accent-blue);
+
+  --color-ready: var(--state-ready);
+  --color-warning: var(--state-warning);
+  --color-error: var(--state-error);
+  --color-online: var(--state-online);
+  --color-offline: var(--state-offline);
+
+  --color-part: var(--obj-part);
+  --color-fixture: var(--obj-fixture);
+  --color-obstacle: var(--obj-obstacle);
+
+  /* Typography */
+  --font-sans: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  /* Full-viewport app shell — no page scroll (ui-context.md: Layout). */
+  overflow: hidden;
+}
