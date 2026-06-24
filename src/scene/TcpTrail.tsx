@@ -3,10 +3,10 @@ import { useFrame } from '@react-three/fiber'
 import { Line } from '@react-three/drei'
 import * as THREE from 'three'
 import { forwardKinematics } from '../kinematics/forward'
-import { mm2m } from '../kinematics/units'
 import { useRobotStore } from '../state/robotStore'
 import { useSettingsStore } from '../state/settingsStore'
 import { SCENE_COLORS } from './colors'
+import { sceneFromFk } from './sceneFrame'
 
 /**
  * TCP motion trail — Phase 3 · Unit 6.
@@ -30,11 +30,6 @@ type Point = [number, number, number]
 const MAX_POINTS = 800
 /** Only append a vertex once the TCP has moved this far (metres). */
 const MIN_SEGMENT_M = 0.002
-
-/** FK pose (mm, Z-up) → scene position (m, Y-up). */
-function sceneFromFk(xMm: number, yMm: number, zMm: number): Point {
-  return [mm2m(xMm), mm2m(zMm), mm2m(-yMm)]
-}
 
 export function TcpTrail() {
   const showTrail = useSettingsStore((s) => s.showTrail)

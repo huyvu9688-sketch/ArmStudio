@@ -115,3 +115,42 @@ export interface Program {
   waypoints: Waypoint[]
   instructions: Instruction[]
 }
+
+/** Position (mm) + Euler rotation (deg) + scale (unitless) for a cell object. */
+export interface Transform3 {
+  position: { x: number; y: number; z: number }
+  rotation: { x: number; y: number; z: number }
+  scale: { x: number; y: number; z: number }
+}
+
+/** What an imported mesh represents in the cell (architecture.md CAD import pipeline). */
+export type CellObjectKind = 'part' | 'fixture' | 'obstacle'
+
+/**
+ * A mesh placed in the 3D cell (Roboguide: Cell Browser item). `geometryRef`
+ * names the source asset (e.g. the imported filename); the actual
+ * `BufferGeometry`/`Group` is held in memory by the loader (`src/cad/`, next
+ * unit) and never serialized into this record.
+ */
+export interface CellObject {
+  id: string
+  name: string
+  kind: CellObjectKind
+  geometryRef: string
+  transform: Transform3
+  color: string
+}
+
+/**
+ * A registered tool or user frame (project-overview.md: "Tool frame and user
+ * frame definitions"). `offset` is direct-entry: for a tool frame it's the
+ * controlled point's offset from the wrist tool0 (mm/deg); for a user frame
+ * it's the origin's offset from the world base. Both reuse `Pose`'s shape
+ * rather than a separate type, since a frame *is* a pose relative to its
+ * parent.
+ */
+export interface Frame {
+  id: string
+  name: string
+  offset: Pose
+}

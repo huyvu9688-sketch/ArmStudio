@@ -1,15 +1,12 @@
 import { Canvas } from '@react-three/fiber'
-import {
-  Grid,
-  OrbitControls,
-  GizmoHelper,
-  GizmoViewport,
-} from '@react-three/drei'
+import { Grid, GizmoHelper, GizmoViewport } from '@react-three/drei'
 import { useSettingsStore } from '../state/settingsStore'
 import { SCENE_COLORS } from './colors'
 import { AxisTriad } from './AxisTriad'
 import { Arm } from './Arm'
 import { TcpTrail } from './TcpTrail'
+import { CellObjects } from './CellObjects'
+import { CameraRig } from './CameraRig'
 
 /**
  * 3D viewport — Phase 1 · Unit 2 (scene shell).
@@ -20,8 +17,10 @@ import { TcpTrail } from './TcpTrail'
  * frame is mapped onto the scene when the arm is added in Units 3–6.
  *
  * Contents for this unit: lighting, an infinite floor grid, the base-frame
- * triad at the origin, an orbit camera, and a corner orientation gizmo. The
- * GLB arm, cell objects, trail, and cameras arrive in later units.
+ * triad at the origin, and a corner orientation gizmo. The GLB arm and TCP
+ * trail joined in their phases; `CellObjects` (Phase 5 · Unit 2) renders
+ * imported CAD meshes from `cellStore`; `CameraRig` (Phase 5 · Unit 7) owns
+ * the orbit camera plus the Orbit/Front/Side/Top/TCP-follow presets.
  */
 export function Viewport() {
   // "Clear trail" bumps this nonce; keying TcpTrail with it remounts a fresh
@@ -41,15 +40,8 @@ export function Viewport() {
       <AxisTriad size={0.3} />
       <Arm />
       <TcpTrail key={trailClearNonce} />
-
-      <OrbitControls
-        makeDefault
-        enableDamping
-        target={[0, 0.2, 0]}
-        minDistance={0.3}
-        maxDistance={6}
-        maxPolarAngle={Math.PI / 2}
-      />
+      <CellObjects />
+      <CameraRig />
 
       <GizmoHelper alignment="bottom-right" margin={[72, 72]}>
         <GizmoViewport

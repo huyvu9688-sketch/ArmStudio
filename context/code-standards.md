@@ -20,6 +20,8 @@
   - `Instruction` — `MovJ | MovL | Wait | Call` (discriminated union)
   - `Waypoint`, `Program` (with a `version` field)
   - `CellObject` — `{ id; name; kind:'part'|'fixture'|'obstacle'; geometryRef; transform; color }`
+  - `Transform3` — `{ position:{x,y,z}; rotation:{x,y,z}; scale:{x,y,z} }` (mm + deg + unitless)
+  - `Frame` — `{ id; name; offset:Pose }` (tool/user frame, direct-entry only)
   - `RobotState` — `{ angles:JointAngles; moving:boolean; fault:string|null }`
   - Protocol messages — discriminated union of `cmd` types and the `state` message
 - Validate all external input at boundaries: program JSON, imported mesh files, bytes/frames from WebSocket and Web Serial.

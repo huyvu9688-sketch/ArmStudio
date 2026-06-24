@@ -3,9 +3,10 @@ import { mat4 } from 'gl-matrix'
 import { JOINT_LIMITS } from '../config/dh-params'
 import { forwardKinematicsMatrix } from '../kinematics/forward'
 import { inverseKinematicsFromMatrix } from '../kinematics/inverse'
-import { matMul } from '../kinematics/linalg'
-import { rot3AboutAxis, rot3FromMat4 } from '../kinematics/rotation'
+import { matMul, transpose } from '../kinematics/linalg'
+import { eulerXYZToRot3, rot3AboutAxis, rot3FromMat4 } from '../kinematics/rotation'
 import { deg2rad } from '../kinematics/units'
+import { activeToolOffset, activeUserOffset, useFramesStore } from '../state/framesStore'
 import { useMachineStore } from '../state/machineStore'
 import { usePendantStore } from '../state/pendantStore'
 import { useRobotStore } from '../state/robotStore'
@@ -61,12 +62,24 @@ function matFromRot3Pos(R: number[][], p: readonly number[]): mat4 {
 /**
  * One Cartesian step: nudge the current TCP transform along the chosen axis in
  * the active frame, then solve IK. Returns false if the move can't be followed
- * (so the loop stops). `frame` is 'world' or 'tool'.
+ * (so the loop stops).
+ *
+ *  - `world` — along the fixed base axes (unaffected by registered frames).
+ *  - `user`  — along the active user frame's axes (Phase 5 · Unit 6); a
+ *    rotation conjugated through the user offset so "user Z" spins about the
+ *    user frame's own Z, not the base's.
+ *  - `tool`  — along the active tool frame's axes, composed with the live
+ *    wrist orientation; rotation is conjugated through the tool offset within
+ *    the wrist's local frame, same idea as `user` but on the other side of Rc.
+ *
+ * Frame *translation* offsets (where the tool/user origin sits, not just its
+ * orientation) aren't applied here — only the axis directions are, per the
+ * scoping decision in progress-tracker.md.
  */
 function applyCartesianStep(
   axis: number,
   dir: 1 | -1,
-  frame: 'world' | 'tool',
+  frame: 'world' | 'tool' | 'user',
   linDelta: number,
   angDelta: number,
 ): boolean {
@@ -76,19 +89,38 @@ function applyCartesianStep(
   let p = [cur[12], cur[13], cur[14]]
   let R = Rc
 
+  const framesState = useFramesStore.getState()
+  const userOffset = activeUserOffset(framesState)
+  const toolOffset = activeToolOffset(framesState)
+  const Ruser = eulerXYZToRot3(deg2rad(userOffset.rx), deg2rad(userOffset.ry), deg2rad(userOffset.rz))
+  const Rtool = eulerXYZToRot3(deg2rad(toolOffset.rx), deg2rad(toolOffset.ry), deg2rad(toolOffset.rz))
+
   if (axis < 3) {
-    // Translation. World: along the base axis; Tool: along the TCP's own axis.
-    const dirVec =
-      frame === 'world'
-        ? [axis === 0 ? 1 : 0, axis === 1 ? 1 : 0, axis === 2 ? 1 : 0]
-        : [Rc[0][axis], Rc[1][axis], Rc[2][axis]]
+    // Translation, along the frame's own axis direction (a column of its rotation).
+    let dirVec: number[]
+    if (frame === 'world') {
+      dirVec = [axis === 0 ? 1 : 0, axis === 1 ? 1 : 0, axis === 2 ? 1 : 0]
+    } else if (frame === 'user') {
+      dirVec = [Ruser[0][axis], Ruser[1][axis], Ruser[2][axis]]
+    } else {
+      const Rt = matMul(Rc, Rtool)
+      dirVec = [Rt[0][axis], Rt[1][axis], Rt[2][axis]]
+    }
     const s = dir * linDelta
     p = [p[0] + s * dirVec[0], p[1] + s * dirVec[1], p[2] + s * dirVec[2]]
   } else {
-    // Rotation about X/Y/Z. World: pre-multiply (base axis); Tool: post-multiply.
+    // Rotation about X/Y/Z, conjugated into the active frame's own axes.
     const a = (axis - 3) as 0 | 1 | 2
-    const Rd = rot3AboutAxis(a, dir * angDelta)
-    R = frame === 'world' ? matMul(Rd, Rc) : matMul(Rc, Rd)
+    const RdLocal = rot3AboutAxis(a, dir * angDelta)
+    if (frame === 'world') {
+      R = matMul(RdLocal, Rc)
+    } else if (frame === 'user') {
+      const Rd = matMul(matMul(Ruser, RdLocal), transpose(Ruser))
+      R = matMul(Rd, Rc)
+    } else {
+      const Rd = matMul(matMul(Rtool, RdLocal), transpose(Rtool))
+      R = matMul(Rc, Rd)
+    }
   }
 
   const res = inverseKinematicsFromMatrix(matFromRot3Pos(R, p), angles)
@@ -139,7 +171,7 @@ export function useJog() {
           applyJointDelta(active.joint, active.dir * rate * dt)
         } else {
           const frame = usePendantStore.getState().activeFrame
-          const f = frame === 'tool' ? 'tool' : 'world'
+          const f = frame === 'tool' || frame === 'user' ? frame : 'world'
           const ok = applyCartesianStep(
             active.axis,
             active.dir,

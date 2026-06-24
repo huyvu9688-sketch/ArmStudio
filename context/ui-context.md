@@ -179,5 +179,24 @@ standalone `InstructionRow` component — kept as plain rows for now since
 Run/Step/Pause/Stop playback (next unit) will likely change each row's shape
 (an active-line highlight). TEACH (`SafetyControls.tsx`) is now live.
 
-Still pending (later phases): `CellTreeNode`, `ObjectPropertyPanel`,
-`ConnectionPill`; the User frame tab.
+**Added in Phase 5:** the Cell Browser (left rail) is live in
+`src/cell/CellBrowser.tsx` using the new `src/ui/CellTreeNode.tsx`
+(`CellTreeSection` collapsible header, `CellTreeLeaf` colored-dot row with a
+hover delete) — Robot/Parts/Fixtures/Obstacles/Targets per the mock above,
+plus a real "+ Import CAD" file picker and viewport drag-drop (with the
+floor-raycast placement code-standards.md describes). Selecting an object
+shows `src/cell/ObjectPropertyPanel.tsx` (the `ObjectPropertyPanel` from the
+component library) below the tree: type (reusing `FrameTab`), color swatches
++ a native color input, and position/rotation/scale number grids — the same
+data a drei `TransformControls` gizmo (mounted in `scene/CellObjects.tsx`)
+writes when you drag-edit the object in the viewport, so both stay in sync.
+The Frame selector's User tab is now enabled (Joint/World/Tool/User all
+active); the pendant gained `src/frames/FramePanel.tsx`, a collapsible
+section for registering tool/user frames (name, active toggle, a 6-field
+mm/deg offset editor, delete) — direct-entry only, per the gap noted in
+progress-tracker.md. `ViewportOverlay.tsx` gained an Orbit/Front/Side/Top/TCP
+button row (top-left, next to Trail/Clear) for the Phase 5 · Unit 7 camera
+presets.
+
+Still pending (later phases): `ConnectionPill`; DH-frame/envelope toggles
+(Phase 6).

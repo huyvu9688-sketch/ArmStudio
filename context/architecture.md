@@ -75,10 +75,34 @@ Imported objects are geometry, never code. Supported formats: **STL, OBJ, GLTF/G
 - Loaders: `STLLoader`, `OBJLoader`, `GLTFLoader` from `three/examples/jsm/loaders`.
 - Entry points: drag-and-drop onto the viewport, or a file picker in the Cell Browser.
 - Flow: file → loader → `THREE.BufferGeometry` / `Group` → wrap as a `CellObject` → push to the cell store.
-- On import, the user assigns the object a type: `part` | `fixture` | `obstacle`.
+- Every import defaults to kind `part`; the user reassigns type (`part`|`fixture`|`obstacle`) and color afterward via `ObjectPropertyPanel` (Phase 5 · Unit 3).
 - `src/cad/` owns loading + validation. `src/cell/` owns the placed-object store. The scene reads the store.
+- The loaded `BufferGeometry`/`Object3D` is never part of `CellObject`/the store (not serializable, not React-diffable) — it lives in `src/cad/geometryCache.ts`, a plain `Map` keyed by object id, disposed when the object is removed.
 - Validation: reject unsupported extensions, cap file size (e.g. 50 MB), center geometry, report load errors to the UI. Never `eval`, never run embedded scripts.
 - STEP / IGES are out of scope (would need `occt-import-js`). Reject with a clear message.
+- Object placement: `scene/CellObjects.tsx` renders every object at its `transform` (mm/deg → m/rad at this boundary); the selected object gets a drei `TransformControls` (translate, Shift to rotate) whose `onObjectChange` writes back to the store — the mesh is never the source of truth.
+
+---
+
+## Tool and User Frames
+
+Direct-entry registration only (Phase 5 · Unit 6) — the 3-point capture
+method from `project-overview.md` is an open question, not yet built.
+
+- `src/frames/` owns the pure `Frame` constructor (`framesModel.ts`) and the
+  registration UI (`FramePanel.tsx`, a collapsible pendant section).
+  `src/state/framesStore.ts` holds `toolFrames[]`/`userFrames[]` plus which
+  one is active (`null` = the un-offset identity — tool0 / world base).
+- A `Frame` is `{id, name, offset: Pose}` — mm/deg, relative to its parent
+  (tool0 for tool frames, the world base for user frames).
+- The pendant's User tab jogs along the active user frame's axes; Tool jogs
+  along the active tool frame's axes composed with the live wrist
+  orientation — both computed in `pendant/useJog.ts`'s `applyCartesianStep`
+  via `eulerXYZToRot3` + conjugation, not a new IK mode.
+- **Scope limit:** only the frame's *orientation* is applied to jog axes.
+  The *translation* offset (e.g. a gripper's length) does not shift the IK
+  target — jogging still controls the flange/tool0 point, not the registered
+  frame's origin. See `progress-tracker.md`'s Open Questions.
 
 ---
 
@@ -144,8 +168,21 @@ useMotion.ts}`, `src/scene/*` (incl. `TcpTrail`, `ViewportOverlay`),
 SpeedOverride,PoseReadout,KinematicsReadout,GoToPose,SafetyControls,StatusStrip}.tsx`
 + `useJog.ts` + `jogMath.ts` (+ `jogMath.test.ts`), `src/types.ts`. The full
 kinematics API (`forwardKinematics`, `inverseKinematics`, `computeJacobian`,
-`manipulability`) now exists. `src/{robot,cad,cell,frames,online}/` and the rest
-of `src/program/` (instruction model, editor) arrive in their phases.
+`manipulability`) now exists. Phase 4 added the full `src/program/` module
+(`instructionModel`, `migrate`, `serialize`, `ProgramEditor`,
+`useProgramPlayback`) + `src/state/{programStore,playbackStore}.ts`.
+
+Phase 5 (now complete) added: `src/cell/{cellStore,CellBrowser,cellColors,
+ObjectPropertyPanel}.ts(x)` (placed-object store, Cell Browser tree, type/
+color/transform property panel) + `src/ui/CellTreeNode.tsx`; the full
+`src/cad/` module (`validate`, `loaders`, `geometryCache`, `importCadFile`);
+`src/scene/{CellObjects,CameraRig,sceneFrame,activeCamera,dropToFloor}.tsx/ts`
+(cell-object rendering + the transform gizmo, the camera-view presets, the
+shared FK→scene mapping `TcpTrail` also uses, and the floor raycast behind
+drag-to-place); `src/frames/{framesModel,FramePanel}.ts(x)` +
+`src/state/framesStore.ts` (tool/user frame registration, wired into
+`pendant/useJog.ts`'s Cartesian jog). `src/{robot,online}/` arrive in their
+phases.
 
 **Scene coordinate mapping:** FK works in a Z-up DH base frame; the three.js
 scene is Y-up. FK geometry (TCP marker, trail) is mapped (x,y,z)→(x,z,−y) and

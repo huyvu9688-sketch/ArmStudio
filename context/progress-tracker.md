@@ -6,8 +6,9 @@ Update this file after every meaningful implementation change.
 
 ## Current Phase
 
-Phase 4 — Offline programmer: **COMPLETE (Units 1–4).** Ready to start
-Phase 5 (3D cell + CAD import) when the user says so.
+Phase 5 — 3D cell + CAD import: **COMPLETE (Units 1–7).**
+
+Phase 4 — Offline programmer: **COMPLETE (Units 1–4).**
 
 Phase 3 — IK + Cartesian + linear moves: **COMPLETE (Units 1–6).**
 
@@ -19,20 +20,23 @@ but functionally done — build + tests green.)
 
 ## Current Goal
 
-Phase 3 done. The kinematics engine is complete: damped-least-squares IK, a
-geometric Jacobian + manipulability, World/Tool Cartesian jog through IK, MOVJ vs
-MOVL motion primitives with "go to pose", a TCP motion trail, and a live
-singularity warning.
+Phase 5 done. The 3D cell is complete: a Cell Browser tree, STL/OBJ/GLTF CAD
+import (file picker + drag-drop), type/color assignment, a drei transform
+gizmo + numeric property panel, registered tool/user frames wired into the
+pendant's Cartesian jog, and five camera-view presets (Orbit/Front/Side/Top/
+TCP-follow).
 
-**Done-when (all met):** IK round-trips `fk(ik(pose)) ≈ pose` and returns a typed
-reason on failure; World/Tool jog moves the TCP along the chosen frame axes; MOVL
-traces a straight line and MOVJ a joint-interpolated path; the trail renders both;
-the singularity warning fires near the wrist-aligned config; `npm run build`,
-`npm run lint`, and `npm run test` (46 tests) all pass.
+**Done-when (met):** importing a mesh, positioning it with the gizmo, and
+defining a tool frame all work end-to-end; `npm run build`, `npm run lint`,
+and `npm run test` (63 tests) all pass. See "Phase 5 done-when met" above for
+the full verification and the known gaps carried forward.
 
-Earlier phases: Phase 2 shipped the FANUC iPendant-style pendant (frame selector,
-jog mode + step, joint +/- jog, speed override, HOLD, latched E-STOP, HOME, live
-status strip). Phase 1 shipped the GLB arm + scene + forward kinematics.
+Earlier phases: Phase 4 shipped the offline programmer (instructions, TEACH,
+Run/Step/Pause/Stop/Loop, Save/Load/.tp). Phase 3 shipped the kinematics
+engine (IK, Jacobian, Cartesian jog, MOVJ/MOVL, TCP trail, singularity
+warning). Phase 2 shipped the FANUC iPendant-style pendant (frame selector,
+jog mode + step, joint +/- jog, speed override, HOLD, latched E-STOP, HOME,
+live status strip). Phase 1 shipped the GLB arm + scene + forward kinematics.
 
 ## What exists after Phase 1 (handoff snapshot)
 
@@ -320,8 +324,171 @@ point, editor (add/del/reorder), Run/Step/Pause/Stop/Loop, JSON save/load, and
 drawer. Known gaps carried forward: CALL has no resolvable target (no second
 program / program registry exists yet — would need its own unit beyond the
 original Phase 4 plan); the FK↔GLB visual mismatch and joint-jog-direction
-sign-off remain open from earlier phases. Phase 5 (3D cell + CAD import) is
-next when the user says so.
+sign-off remain open from earlier phases.
+
+- **Phase 5 · Unit 1 — Cell store + Cell Browser tree.** `src/types.ts` adds
+  `Transform3` (position mm / rotation deg / scale) and `CellObject`
+  (`{id,name,kind:'part'|'fixture'|'obstacle',geometryRef,transform,color}`,
+  per code-standards.md). New `src/cell/cellStore.ts` (zustand:
+  `objects`/`selectedId` + `addObject`/`removeObject`/`selectObject`) — empty
+  until CAD import (next unit) calls `addObject`; this unit ships the shape
+  and selection slot only, per the scoping rule against combining CAD import
+  with cell-browser UI in one step. New `src/ui/CellTreeNode.tsx`
+  (`CellTreeSection` collapsible header, `CellTreeLeaf` colored-dot row) and
+  `src/cell/CellBrowser.tsx`: the ui-context.md tree — Robot (static),
+  Parts/Fixtures/Obstacles (filtered from `cellStore.objects`, each shows
+  "none imported" while empty), Targets (the active program's taught
+  waypoints, read from `programStore` — no separate target store, reuses
+  Phase 4's `Waypoint[]`), and a "+ Import CAD" button shipped visibly
+  disabled (tooltip "needs CAD import — next unit"), matching the established
+  pattern (e.g. Phase 2's World/Tool frame tabs). Replaces the `App.tsx`
+  left-rail placeholder. Verified in a headless browser (Playwright, temp dev
+  dependency, removed after): all five tree sections render, sections
+  collapse/expand, Import CAD is disabled, zero console errors. `npm run
+  build` + `npm run lint` + `npm run test` (63 tests) all pass.
+
+- **Phase 5 · Unit 2 — CAD import.** New `src/cad/`: `validate.ts`
+  (`validateCadFile` — extension allow-list `stl|obj|gltf|glb`, 50 MB cap,
+  explicit STEP/IGES rejection message); `loaders.ts` (`loadCadFile` —
+  `STLLoader`/`OBJLoader`/`GLTFLoader` from `three/examples/jsm/loaders`,
+  each result centered on its own local origin per code-standards.md, not
+  positioned by the source file's modeled offset); `geometryCache.ts` (a
+  plain `Map<id, BufferGeometry|Object3D>` — the loaded three.js object is
+  deliberately *not* part of `CellObject`/`cellStore`, per the comment
+  already on `CellObject` in types.ts, so the store stays plain/serializable;
+  `disposeCadGeometry` frees GPU geometry/materials on removal);
+  `importCadFile.ts`/`importCadFiles` (the single entry point for both the
+  file picker and viewport drag-drop: validate → load → cache → push a
+  `CellObject` to `cellStore`, defaulting every import to kind `part` — Unit
+  3 adds a way to change it). `cellStore.removeObject` now also calls
+  `disposeCadGeometry`; added an `importError` slot + `setImportError` so the
+  file picker and the drag-drop path share one error banner. `CellBrowser.tsx`:
+  "+ Import CAD" now opens a real file picker (was disabled); leaves gained a
+  hover `×` delete (`CellTreeNode.tsx`'s `CellTreeLeaf` grew an optional
+  `onDelete`). `App.tsx`'s viewport `<main>` gained `onDragOver`/`onDrop`
+  calling the same `importCadFiles`. New `src/scene/CellObjects.tsx` renders
+  every `cellStore` object at its transform (mm/deg → m/rad at this
+  boundary, architecture.md invariant #3): STL geometry has no inherent
+  material, so it's wrapped in a mesh colored by `object.color`; OBJ/GLTF
+  bring their own materials and render via `<primitive>` unchanged. Mounted
+  in `Viewport.tsx`. `scene/colors.ts` gained `objPart`/`objFixture`/
+  `objObstacle`; `cell/cellColors.ts` is the shared part/fixture/obstacle
+  color map (tree dots, import default, scene fallback material).
+  **Bug caught during verification:** the file-input `onChange` read
+  `e.target.files` (a *live* `FileList`) and then cleared `e.target.value`
+  to allow re-selecting the same file — but clearing `value` empties that
+  same live list, so the import silently saw zero files. Fixed by copying
+  to a plain array (`Array.from`) before clearing, in both the file-picker
+  handler and the drag-drop handler. Verified in a headless browser
+  (Playwright, temp dev dependency, removed after): importing a real `.stl`
+  adds a "Parts (1)" leaf showing the filename, selecting/deleting it removes
+  it from the tree, and importing a `.xyz` file surfaces the typed
+  "Unsupported file type" banner instead of failing silently — zero console
+  errors throughout. `npm run build` + `npm run lint` + `npm run test`
+  (63 tests) all pass.
+  **Follow-up (caught while syncing docs after Unit 7):** code-standards.md
+  already documented "drag-to-place uses raycasting against the floor plane,"
+  but drops were landing at the cell origin regardless of where they were
+  dropped. Added `src/scene/activeCamera.ts` (a live camera handle —
+  `CameraRig`, Unit 7, keeps it current — since the native HTML drop handler
+  in `App.tsx` lives outside the r3f `Canvas` and has no other way to reach
+  the active camera) and `src/scene/dropToFloor.ts` (raycasts the drop's
+  client coordinates onto the y=0 floor plane, returns mm). `importCadFile`/
+  `importCadFiles` gained an optional `position` param threaded through from
+  `App.tsx`'s drop handler. Verified with a synthetic `DragEvent` + `DataTransfer`
+  carrying a real file: an off-center drop produced a non-origin floor position
+  in the property panel, zero console errors.
+
+- **Phase 5 · Unit 3 — Assign type + color.** New `src/cell/ObjectPropertyPanel.tsx`
+  (the `ObjectPropertyPanel` named in ui-context.md's component library):
+  shown in the Cell Browser rail when a `CellObject` is selected. Type is
+  three `FrameTab`s (Part/Fixture/Obstacle, reusing the Phase 2 segmented-tab
+  primitive) that move the object between the tree's sections; color is the
+  three kind presets plus a native `<input type="color">` for a custom value.
+  `cellStore` gained a generic `updateObject(id, patch)` (rather than a setter
+  per field) since Unit 5 needs to patch `transform` too. `npm run build` +
+  `lint` + `test` (63 tests) pass.
+
+- **Phase 5 · Unit 4 — Transform gizmo.** `scene/CellObjects.tsx`: the
+  selected object gets a drei `TransformControls` attached to its group ref.
+  Translate by default; holding Shift switches to rotate (architecture.md's
+  mock: "drag to move, shift-drag to rotate") — tracked via a plain
+  `keydown`/`keyup` listener while selected, not a new store field, since it's
+  transient interaction state no other component needs. `onObjectChange`
+  reads the dragged group's position/rotation/scale and pushes them through
+  `cellStore.updateObject` (mm/deg, converted at this boundary) rather than
+  leaving the mesh as the source of truth (code-standards.md: "writes back to
+  the cell store, not directly to the mesh"). `OrbitControls.makeDefault` in
+  `Viewport` means drei auto-disables orbiting for the duration of a drag.
+  **Lint catch:** the strict `react-hooks/refs` rule (first hit in Phase 3)
+  flagged reading `groupRef.current` during render to decide whether to mount
+  `TransformControls`; removed the check — the group always renders first, so
+  by the time `selected` flips true the ref is already populated. `npm run
+  build` + `lint` + `test` (63 tests) pass.
+
+- **Phase 5 · Unit 5 — Object property panel (position/rotation/scale).**
+  `ObjectPropertyPanel.tsx` extended with three `Vec3Row`s (Position mm,
+  Rotation deg, Scale ×) — direct-entry numeric inputs that write through the
+  same `updateObject` the Unit 4 gizmo uses, so dragging in the viewport and
+  typing in the panel stay in sync (both are just writes to `cellStore`).
+  `npm run build` + `lint` + `test` (63 tests) pass.
+
+- **Phase 5 · Unit 6 — Tool + user frame registration.** `types.ts` adds
+  `Frame` (`{id, name, offset: Pose}` — a frame *is* a pose relative to its
+  parent: tool0 for tool frames, the world base for user frames). New
+  `src/frames/framesModel.ts` (pure `createFrame`) and `src/state/
+  framesStore.ts` (zustand: separate `toolFrames[]`/`userFrames[]` +
+  `activeToolFrameId`/`activeUserFrameId`, each nullable — `null` means the
+  un-offset identity, so no seed frame is needed; `activeToolOffset`/
+  `activeUserOffset` selectors fall back to a zero `Pose`). New `src/frames/
+  FramePanel.tsx`: a collapsible section in the pendant (direct-entry only —
+  the 3-point capture method from project-overview.md is a documented gap,
+  see below) listing each frame with a name, an active toggle, a 6-field
+  mm/deg offset editor, and delete. `FrameSelector.tsx`'s User tab is now
+  enabled (was disabled since Phase 2); `Pendant.tsx` treats `user` as a
+  Cartesian frame like `world`/`tool` and mounts `FramePanel`.
+  **The actual jog-axis math** (`pendant/useJog.ts`'s `applyCartesianStep`):
+  World jog is unchanged (fixed base axes); User jog uses the active user
+  frame's rotation matrix (`eulerXYZToRot3` on its `rx/ry/rz`) for translation
+  axis directions, and conjugates the rotation step through that same matrix
+  (`Ruser·Rd·Ruserᵀ`) so "User Rz" spins about the user frame's own Z, not the
+  base's; Tool jog does the symmetric thing on the wrist side (`Rc·Rtool` for
+  translation axes, `Rc·(Rtool·Rd·Rtoolᵀ)` for rotation). **Scoping decision:**
+  only the frame's *orientation* offset is applied to jog axes — the
+  *translation* offset (where the tool/user origin actually sits, e.g. a
+  gripper's length) is not, since correctly shifting the IK target by that
+  offset would mean solving for a controlled point other than the flange,
+  a bigger change than this unit's "registration + frame selector" scope.
+  Recorded as an open question below. `npm run build` + `lint` + `test`
+  (63 tests) pass.
+
+- **Phase 5 · Unit 7 — Multiple camera views.** New `src/scene/sceneFrame.ts`:
+  extracted the FK→scene (`(x,y,z)_fk → (x,z,−y)_scene`, mm→m) mapping out of
+  `TcpTrail.tsx` so `CameraRig` could reuse it without duplicating the
+  convention. New `src/scene/CameraRig.tsx` replaces the bare `OrbitControls`
+  in `Viewport.tsx`: Orbit/Front/Side/Top are one-shot snaps (set
+  `camera.position` + `controls.target`, then the user can still orbit
+  freely — Roboguide's preset views work the same way); TCP-follow
+  continuously re-centers `controls.target` on the live TCP each frame (via
+  `useFrame`, reading the robot store directly rather than subscribing, same
+  pattern as `TcpTrail`), so you orbit *around* the tool point instead of the
+  origin. `settingsStore` gained `cameraView` + a `cameraSnapNonce` bump
+  counter (so re-clicking the same preset re-snaps even though the value
+  didn't change) + `setCameraView`. `ViewportOverlay.tsx` gained the
+  Orbit/Front/Side/Top/TCP button row next to the trail controls. `npm run
+  build` + `lint` + `test` (63 tests) pass.
+
+**Phase 5 done-when met:** importing an STL/OBJ/GLTF mesh, positioning it with
+the gizmo, and defining a tool frame all work end-to-end (project-overview.md's
+phase done-when). Verified together in a headless browser: import → select →
+reassign type (moves tree sections) → drag-edit position via the gizmo →
+confirm the property panel's numbers update → register a tool frame → switch
+the pendant to the User frame → snap through all five camera presets — zero
+console errors throughout. Known gaps carried forward (see Open Questions):
+the 3-point tool/user frame capture method is unimplemented (direct-entry
+only); tool/user frame *translation* offsets don't shift the Cartesian jog's
+IK target, only axis orientation does. Phase 6 (study + visualization tools)
+is next when the user says so.
 
 ## What exists after Phase 3 (handoff snapshot)
 
@@ -409,14 +576,17 @@ next when the user says so.
 
 ## In Progress
 
-- Phase 4 complete (instruction model, program editor + TEACH,
-  Run/Step/Pause/Stop/Loop playback, Save/Load/.tp). Ready to start Phase 5
-  (3D cell + CAD import) when the user says so. Open: user sign-off on joint
-  jog directions (flip any `sign` in `glb-joint-map.ts`); the FK↔GLB visual
-  mismatch (trail/TCP marker are in FK/base coords) — a re-rig of the GLB to
-  Link1..Link6 would let FK geometry sit on the mesh; CALL has no resolvable
-  target (no second program / program registry exists yet — its own unit
-  beyond the original phase plans, whenever multi-program support is wanted).
+- Phase 5 complete (Cell Browser, CAD import, type/color assignment,
+  transform gizmo, object property panel, tool/user frames, camera views).
+  Ready to start Phase 6 (study + visualization tools) when the user says so.
+  Open: user sign-off on joint jog directions (flip any `sign` in
+  `glb-joint-map.ts`); the FK↔GLB visual mismatch (trail/TCP marker are in
+  FK/base coords) — a re-rig of the GLB to Link1..Link6 would let FK geometry
+  sit on the mesh; CALL has no resolvable target (no second program /
+  program registry exists yet); tool/user frame 3-point capture is
+  unimplemented (direct-entry only); frame *translation* offsets don't shift
+  the Cartesian jog's IK target, only axis orientation does (see Phase 5
+  Unit 6 above and Open Questions below).
 
 ---
 
@@ -491,6 +661,8 @@ E-STOP/HOLD/HOME behave, status strip is live, build + tests pass.
 - GLB node names must match `JOINT_NODES`; inspect after download, rename in Blender if needed.
 - DH values locked to approximate dimensions; update once physical link lengths are measured.
 - Online transport: both specced. Decide the actual hardware (Teensy-USB vs ESP32/Pi-Ethernet) before Phase 7 unit 3. USB is simpler/lower-latency; Ethernet/WiFi gives wireless and the Roboguide feel.
+- Tool/user frame 3-point capture method (project-overview.md) is unimplemented — Phase 5 Unit 6 shipped direct-entry only. Add as its own unit if the 3-point workflow (jog to touch a point, repeat for origin/X/Y) is wanted.
+- Tool/user frame *translation* offsets don't move the Cartesian jog's IK target (only axis orientation is applied — see Phase 5 Unit 6's scoping decision). Revisit if a registered tool frame needs to actually be the controlled point (e.g. jogging the tip of a gripper, not the flange).
 
 ---
 

@@ -2,17 +2,17 @@ import { usePendantStore, type JogFrame } from '../state/pendantStore'
 import { FrameTab } from '../ui/FrameTab'
 
 /**
- * Frame selector — Phase 2 · Unit 3.
+ * Frame selector — Phase 2 · Unit 3, User enabled in Phase 5 · Unit 6.
  *
- * Picks the jog reference frame. Joint, World, and Tool are active as of Phase 3
- * (Cartesian jog solves IK live). User frame stays disabled until user-frame
- * registration lands in Phase 5.
+ * Picks the jog reference frame. Joint/World/Tool jog by solving IK live
+ * (Phase 3); User jogs along the active registered user frame's axes
+ * (`useJog.ts`, `framesStore`) — register one in the Frames panel.
  */
-const FRAMES: { id: JogFrame; label: string; enabled: boolean }[] = [
-  { id: 'joint', label: 'Joint', enabled: true },
-  { id: 'world', label: 'World', enabled: true },
-  { id: 'tool', label: 'Tool', enabled: true },
-  { id: 'user', label: 'User', enabled: false },
+const FRAMES: { id: JogFrame; label: string }[] = [
+  { id: 'joint', label: 'Joint' },
+  { id: 'world', label: 'World' },
+  { id: 'tool', label: 'Tool' },
+  { id: 'user', label: 'User' },
 ]
 
 export function FrameSelector() {
@@ -28,8 +28,7 @@ export function FrameSelector() {
             key={f.id}
             label={f.label}
             active={activeFrame === f.id}
-            disabled={!f.enabled}
-            title={f.enabled ? `Jog in ${f.label} frame` : 'User frame needs registration — Phase 5'}
+            title={`Jog in ${f.label} frame`}
             className="flex-1"
             onClick={() => setFrame(f.id)}
           />
