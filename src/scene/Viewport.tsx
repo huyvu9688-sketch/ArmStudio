@@ -8,6 +8,7 @@ import { TcpTrail } from './TcpTrail'
 import { CellObjects } from './CellObjects'
 import { CameraRig } from './CameraRig'
 import { MeasureTool } from './MeasureTool'
+import { DhFrameGizmos } from './DhFrameGizmos'
 
 /**
  * 3D viewport — Phase 1 · Unit 2 (scene shell).
@@ -43,6 +44,7 @@ export function Viewport() {
       <TcpTrail key={trailClearNonce} />
       <CellObjects />
       <MeasureTool />
+      <DhFrameGizmos />
       <CameraRig />
 
       <GizmoHelper alignment="bottom-right" margin={[72, 72]}>

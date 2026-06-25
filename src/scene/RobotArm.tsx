@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -96,9 +96,54 @@ export function RobotArm() {
 
   // Measure tool: while armed, a click on the mesh records the raycast hit's
   // world-space point (scene metres) as a ruler endpoint. onClick (not
-  // pointerdown) so dragging to orbit doesn't drop a stray point.
+  // pointerdown) so dragging to orbit doesn't drop a stray point. Hovering
+  // extracts the exact triangle the raycast hit (not the whole mesh object —
+  // a GLB link is one mesh with many faces, so highlighting the object lit
+  // up the entire link) and stores its 3 world-space vertices for
+  // `MeasureTool` to render as a small overlay, so you see precisely which
+  // face you're about to click.
   const measureActive = useMeasureStore((s) => s.active)
   const addMeasurePoint = useMeasureStore((s) => s.addPoint)
+  const setHoverFace = useMeasureStore((s) => s.setHoverFace)
+  const lastFaceKey = useRef<string | null>(null)
+
+  // Reset hover/cursor the instant measure mode is turned off (e.g. via the
+  // overlay button while the pointer never left the canvas).
+  useEffect(() => {
+    if (!measureActive) {
+      document.body.style.cursor = 'auto'
+      setHoverFace(null)
+      lastFaceKey.current = null
+    }
+  }, [measureActive, setHoverFace])
+
+  function onModelPointerMove(e: ThreeEvent<PointerEvent>) {
+    if (!measureActive) return
+    document.body.style.cursor = 'crosshair'
+    const mesh = e.object as THREE.Mesh
+    if (!mesh.isMesh || !e.face) return
+
+    const key = `${mesh.uuid}:${e.faceIndex}`
+    if (key === lastFaceKey.current) return
+    e.stopPropagation()
+    lastFaceKey.current = key
+
+    const pos = mesh.geometry.attributes.position
+    const toWorld = (i: number) => new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld)
+    const [a, b, c] = [e.face.a, e.face.b, e.face.c].map(toWorld)
+    setHoverFace([
+      [a.x, a.y, a.z],
+      [b.x, b.y, b.z],
+      [c.x, c.y, c.z],
+    ])
+  }
+
+  function onModelPointerLeave() {
+    if (!measureActive) return
+    document.body.style.cursor = 'auto'
+    setHoverFace(null)
+    lastFaceKey.current = null
+  }
 
   function onModelClick(e: ThreeEvent<MouseEvent>) {
     if (!measureActive) return
@@ -106,7 +151,14 @@ export function RobotArm() {
     addMeasurePoint([e.point.x, e.point.y, e.point.z])
   }
 
-  return <primitive object={model} onClick={onModelClick} />
+  return (
+    <primitive
+      object={model}
+      onClick={onModelClick}
+      onPointerMove={onModelPointerMove}
+      onPointerLeave={onModelPointerLeave}
+    />
+  )
 }
 
 useGLTF.preload(ARM_GLB_URL)

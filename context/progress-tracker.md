@@ -6,6 +6,14 @@ Update this file after every meaningful implementation change.
 
 ## Current Phase
 
+Phase 6 — Study + visualization tools: **PAUSED after Unit 1.** DH frame
+gizmos (Unit 1) are built and confirmed working, but they exposed a real,
+quantified DH↔GLB geometry mismatch (see below) — Units 2–5 (work envelope,
+live DH editor, reach test, singularity map) all build on the same
+`DH_PARAMS`, so the user chose to reconcile that table against the real GLB
+before continuing rather than build more visualizations on numbers known to
+be wrong away from home pose.
+
 Phase 5 — 3D cell + CAD import: **COMPLETE (Units 1–7).**
 
 Phase 4 — Offline programmer: **COMPLETE (Units 1–4).**
@@ -590,20 +598,72 @@ is next when the user says so.
 
 - **Measure tool (for the GLB↔DH comparison).** A two-point scene ruler so the
   GLB's real link lengths can be measured and compared against the locked DH
-  table — the user is preparing a properly-configured GLB and will reconcile
-  the FK model to it. New `src/state/measureStore.ts` (active flag + up to two
-  scene-space points; third click restarts), `src/scene/MeasureTool.tsx`
-  (markers + line, `depthTest:false` so they read through the mesh).
-  `RobotArm.tsx`'s `<primitive>` gained an `onClick` (gated on
-  `measureStore.active`) that records the raycast hit's world point — onClick
-  not onPointerDown so orbiting doesn't drop stray points.
-  `ViewportOverlay.tsx` adds a Measure toggle + a readout showing the
-  straight-line distance (mm) and per-axis ΔX/ΔY/ΔZ in the **FK/DH frame** via
-  new `fkFromScene` (inverse of `sceneFromFk` in `scene/sceneFrame.ts`, tested
-  round-trip). Note: distances are the GLB's own modelled scale (the mesh is
-  added unscaled), which is exactly what's wanted to check against DH a/d —
-  any GLB↔DH discrepancy is the measurement, not an error. `npm run build` +
-  `lint` + `test` (60 tests, +2) pass.
+  table. New `src/state/measureStore.ts` (active flag + up to two scene-space
+  points, third click restarts; `hoverFace` for live face highlighting),
+  `src/scene/MeasureTool.tsx`. `RobotArm.tsx`'s `<primitive>` gained an
+  `onClick` (gated on `measureStore.active`) that records the raycast hit's
+  world point — onClick not onPointerDown so orbiting doesn't drop stray
+  points. `ViewportOverlay.tsx` adds a Measure toggle + a readout. Iterated
+  through three revisions in this session:
+  1. Straight-line distance + ΔX/ΔY/ΔZ via new `fkFromScene` (inverse of
+     `sceneFromFk`, tested round-trip) — the **FK/DH frame**, not scene
+     coords, so a/d comparisons line up directly.
+  2. Added an axis-lock (Free/X/Y/Z), then **replaced it** with always-on
+     SolidWorks-style decomposition: `buildStaircase` in `MeasureTool.tsx`
+     draws the segment as 3 axis-aligned legs (one per DH axis) colored to
+     match the existing base-triad convention (new `FK_AXIS_TO_SCENE` in
+     `sceneFrame.ts`, tested), plus a dashed direct-distance line — all
+     simultaneously, no toggle needed.
+  3. Hover now highlights the *exact triangle* under the cursor (extracts
+     `e.face`'s 3 vertices from the geometry, world-transforms them, draws a
+     small overlay), not the whole mesh object — the GLB's links are single
+     meshes with hundreds of faces, so an earlier per-object-material-clone
+     version lit up an entire link instead of one face.
+  `npm run build` + `lint` + `test` (61 tests) pass.
+
+- **Phase 6 · Unit 1 — DH frame gizmos.** New `src/scene/DhFrameGizmos.tsx`:
+  one small `AxisTriad` per joint, positioned/oriented live from
+  `jointTransforms(angles)` (unchanged, pure scene-layer unit per
+  ai-workflow-rules.md). Mapping a whole frame into the Y-up scene is the
+  fixed −90°-about-X remap left-multiplied onto the frame's 4×4 transform
+  (`scene_T = FK_TO_SCENE · fk_T`); gl-matrix's `mat4` and `THREE.Matrix4`
+  share the same column-major layout so it loads via `fromArray` directly.
+  `settingsStore` gained `showDhFrames`/`toggleDhFrames`; new **DH Frames**
+  button in `ViewportOverlay.tsx`. Mounted unconditionally in `Viewport.tsx`
+  (matches `TcpTrail`'s always-mounted pattern). User confirmed the math is
+  correct (verified independently: at home pose all 6 frames cluster within
+  0.25 m of the base, exactly where expected) — but flagged the gizmos
+  visibly diverging from the GLB mesh once joints move away from home.
+
+  **Finding: DH_PARAMS does not match the real GLB's geometry — quantified.**
+  This isn't the already-known "FK trail/marker render in base coords, not
+  attached to the auto-seated mesh" cosmetic offset; it's that the GLB mesh
+  (driven by `glb-joint-map.ts` spinning named rig nodes by angle, with no
+  awareness of link lengths) and the FK skeleton (driven by `DH_PARAMS`' a/d
+  values) are two geometrically *different* arms that only happen to look
+  aligned at the home pose they were eyeballed against — they diverge
+  increasingly as joints move, compounding down the chain. Extracted the
+  rig's pivot empties' rest-pose world positions directly from the GLB via
+  headless Blender (`Null→Null_2→Null_3→Null_4→Null_1→Null_6→Sphere`) and
+  computed real pivot-to-pivot distances vs. each DH link's `√(a²+d²)`:
+
+  | Segment | DH locked | Real GLB |
+  |---|---|---|
+  | J1→J2 | 200.0 mm | 119.1 mm |
+  | J2→J3 | 50.0 mm | 65.8 mm |
+  | J3→J4 | 200.0 mm | 160.3 mm |
+  | J4→J5 | 0.0 mm | 52.7 mm |
+  | J5/J6→tip | 60.0 mm | 225.9 mm |
+  | **Total reach** | **710.0 mm** | **623.7 mm** |
+
+  These are straight-line pivot distances, not yet properly decomposed into
+  rigorous DH `a`/`d` (that needs each joint's true 3D rotation-axis
+  direction folded in, not just point positions — flagged as a caveat, not
+  done yet to avoid presenting under-verified numbers as authoritative).
+  **Decision:** user chose to pause Phase 6 here and reconcile `DH_PARAMS`
+  against this real geometry before building Units 2–5, which all read the
+  same table. `npm run build` + `lint` + `test` (61 tests) pass; Unit 1
+  itself is confirmed correct and stays in the tree.
 
 - **Pendant jog UX: drag-bar + exact-entry, no held jog.** Replaced the +/-
   jog buttons on both the joint grid and the World/Tool/User Cartesian grid
@@ -631,6 +691,29 @@ is next when the user says so.
   `applyCartesianStep` in git history rather than `useJog.ts`, which no
   longer exists). `npm run build` + `lint` + `test` (58 tests, -5 from the
   removed jogMath functions) pass.
+
+- **Phase 6 · Unit 1 — DH frame gizmos.** New `src/scene/DhFrameGizmos.tsx`:
+  one small `AxisTriad` (size 0.08 m, vs. the base triad's 0.3 m) per joint,
+  positioned/oriented live from `jointTransforms(angles)`'s six cumulative
+  DH frames (`kinematics/forward.ts`, unchanged — pure scene-layer unit per
+  ai-workflow-rules.md's "don't combine scene + kinematics changes"). Mapping
+  a whole frame (not just a point, like `TcpTrail`/`CameraRig` already do)
+  into the Y-up scene is the same fixed −90°-about-X remap left-multiplied
+  onto the frame's 4×4 transform: `scene_T = FK_TO_SCENE · fk_T` — rotates
+  the frame's basis vectors the same way `sceneFromFk` rotates a position.
+  gl-matrix's `mat4` and `THREE.Matrix4` share the same column-major memory
+  layout, so the DH `mat4` loads directly via `THREE.Matrix4.fromArray`, no
+  manual decomposition. `settingsStore` gained `showDhFrames`/
+  `toggleDhFrames` (doc comment there already anticipated this). Mounted
+  unconditionally in `Viewport.tsx` (matches `TcpTrail`'s always-mounted,
+  internally-gated pattern, so toggling doesn't remount); each triad's own
+  `visible` prop follows the toggle, and the `useFrame` early-returns when
+  off. New **DH Frames** button in `ViewportOverlay.tsx` (Axis3D icon,
+  amber active state, same pattern as Trail/Measure). `npm run build` +
+  `lint` + `test` (61 tests) pass; dev server serves 200, `DhFrameGizmos.tsx`
+  transforms cleanly. **Awaiting user visual confirm** (toggle DH Frames,
+  jog a joint, confirm all six small triads track the arm's actual link
+  frames without drift/flicker) before Unit 2 (work envelope).
 
 - **Resolved: GLB had no node names.** The `public/models/robot-arm.glb` in
   use partway through this session had 0/23 named nodes (a re-export had
@@ -726,7 +809,13 @@ E-STOP/HOLD/HOME behave, status strip is live, build + tests pass.
 
 - GLB model source: which Sketchfab model. Recommend a UR5-style 6R arm. Confirm before Phase 1 unit 3.
 - GLB node names must match `JOINT_NODES`; inspect after download, rename in Blender if needed.
-- DH values locked to approximate dimensions; update once physical link lengths are measured.
+- **DH↔GLB reconciliation (blocking Phase 6 Units 2–5).** DH values were locked
+  to approximate dimensions; now quantified as genuinely wrong vs. the real
+  GLB (see Phase 6 Unit 1 write-up above for the per-segment table). Next
+  step: derive proper DH `a`/`alpha`/`d` (not just pivot-to-pivot straight-line
+  distance) by folding in each joint's true 3D rotation-axis direction from
+  the rig, update `DH_PARAMS` + `architecture.md`'s locked table together,
+  then re-verify the DH frame gizmos track the mesh correctly away from home.
 - Online transport: both specced. Decide the actual hardware (Teensy-USB vs ESP32/Pi-Ethernet) before Phase 7 unit 3. USB is simpler/lower-latency; Ethernet/WiFi gives wireless and the Roboguide feel.
 - Tool/user frame 3-point capture method (project-overview.md) is unimplemented — Phase 5 Unit 6 shipped direct-entry only. Add as its own unit if the 3-point workflow (jog to touch a point, repeat for origin/X/Y) is wanted.
 - Tool/user frame *translation* offsets don't move the Cartesian jog's IK target (only axis orientation is applied — see Phase 5 Unit 6's scoping decision). Revisit if a registered tool frame needs to actually be the controlled point (e.g. jogging the tip of a gripper, not the flange).

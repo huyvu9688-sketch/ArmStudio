@@ -4,9 +4,9 @@ import { create } from 'zustand'
  * View/settings store — Phase 3 · Unit 6.
  *
  * Non-robot UI preferences for the scene. Starts with the TCP motion trail
- * toggle (Roboguide's path trace); DH-frame and envelope toggles join it in the
- * study-tools phase (Phase 6). `clearTrailNonce` is a bump counter the trail
- * component watches to reset its buffer (it owns the geometry imperatively).
+ * toggle (Roboguide's path trace); `showDhFrames` (Phase 6 · Unit 1) joins it.
+ * `clearTrailNonce` is a bump counter the trail component watches to reset
+ * its buffer (it owns the geometry imperatively).
  */
 /** Camera presets (Phase 5 · Unit 7). 'tcp' continuously re-centers on the live TCP. */
 export type CameraView = 'orbit' | 'front' | 'side' | 'top' | 'tcp'
@@ -24,6 +24,9 @@ interface SettingsStore {
   /** Bumped on every `setCameraView` call so `CameraRig` re-snaps even when re-selecting the same preset. */
   cameraSnapNonce: number
   setCameraView: (view: CameraView) => void
+  /** Per-joint DH coordinate frame gizmos (Phase 6 · Unit 1). */
+  showDhFrames: boolean
+  toggleDhFrames: () => void
 }
 
 export const useSettingsStore = create<SettingsStore>((set) => ({
@@ -37,4 +40,6 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   cameraView: 'orbit',
   cameraSnapNonce: 0,
   setCameraView: (view) => set((s) => ({ cameraView: view, cameraSnapNonce: s.cameraSnapNonce + 1 })),
+  showDhFrames: false,
+  toggleDhFrames: () => set((s) => ({ showDhFrames: !s.showDhFrames })),
 }))

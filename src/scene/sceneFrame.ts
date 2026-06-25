@@ -1,4 +1,5 @@
 import { m2mm, mm2m } from '../kinematics/units'
+import type { JointAxis } from '../types'
 
 /**
  * FK→scene frame mapping — shared by `TcpTrail` and `CameraRig` (Phase 5 ·
@@ -17,4 +18,17 @@ export function sceneFromFk(xMm: number, yMm: number, zMm: number): [number, num
  */
 export function fkFromScene(xM: number, yM: number, zM: number): [number, number, number] {
   return [m2mm(xM), m2mm(-zM), m2mm(yM)]
+}
+
+/**
+ * Which scene-space array index (and sign) a given FK/DH axis varies along,
+ * per the same −90° X mapping: fk.x → scene[0], fk.y → −scene[2], fk.z → scene[1].
+ * Lets the measure tool draw an axis-locked segment (vary only that scene
+ * coordinate between the two points) instead of the raw diagonal between two
+ * arbitrary clicks — a true single-axis caliper reading against the DH table.
+ */
+export const FK_AXIS_TO_SCENE: Record<JointAxis, { index: 0 | 1 | 2; sign: 1 | -1 }> = {
+  x: { index: 0, sign: 1 },
+  y: { index: 2, sign: -1 },
+  z: { index: 1, sign: 1 },
 }

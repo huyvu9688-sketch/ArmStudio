@@ -1,17 +1,23 @@
 import type { ReactNode } from 'react'
-import { Eraser, Ruler, Spline } from 'lucide-react'
+import { Axis3D, Eraser, Ruler, Spline } from 'lucide-react'
 import { useSettingsStore, type CameraView } from '../state/settingsStore'
 import { useMeasureStore } from '../state/measureStore'
-import { fkFromScene } from './sceneFrame'
+import { fkFromScene, FK_AXIS_TO_SCENE } from './sceneFrame'
+import { SCENE_COLORS } from './colors'
+
+/** Scene-index-ordered axis colors, matching AxisTriad/MeasureTool's staircase. */
+const SCENE_AXIS_COLORS = [SCENE_COLORS.axisX, SCENE_COLORS.axisY, SCENE_COLORS.axisZ]
 
 /**
  * Viewport overlay — Phase 3 · Unit 6 (trail) + Phase 5 · Unit 7 (camera views)
- * + measure tool.
+ * + measure tool + Phase 6 · Unit 1 (DH frames).
  *
  * HTML controls floating over the 3D canvas (kept outside the r3f Canvas): the
  * TCP trail toggle/clear, the camera view presets that `CameraRig` reacts to,
- * and the two-point measure tool (toggle + live distance readout). Future view
- * controls (DH-frame toggle) join here in Phase 6.
+ * the two-point measure tool (toggle + live distance readout), and the DH
+ * coordinate frame toggle (`DhFrameGizmos` reacts to `settingsStore.showDhFrames`).
+ * Remaining Phase 6 controls (work envelope, reach test, singularity map) join
+ * here in their own units.
  */
 const CAMERA_VIEWS: { id: CameraView; label: string }[] = [
   { id: 'orbit', label: 'Orbit' },
@@ -29,6 +35,8 @@ export function ViewportOverlay() {
   const setCameraView = useSettingsStore((s) => s.setCameraView)
   const measureActive = useMeasureStore((s) => s.active)
   const toggleMeasure = useMeasureStore((s) => s.toggleActive)
+  const showDhFrames = useSettingsStore((s) => s.showDhFrames)
+  const toggleDhFrames = useSettingsStore((s) => s.toggleDhFrames)
 
   return (
     <div className="pointer-events-none absolute left-3 top-3 flex flex-col items-start gap-1.5">
@@ -91,6 +99,21 @@ export function ViewportOverlay() {
           <Ruler size={14} strokeWidth={2.5} />
           Measure
         </button>
+        <button
+          type="button"
+          onClick={toggleDhFrames}
+          aria-pressed={showDhFrames}
+          title="Toggle per-joint DH coordinate frames"
+          className={[
+            'pointer-events-auto inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-wide transition-colors',
+            showDhFrames
+              ? 'border-amber bg-amber text-[color:var(--bg-base)]'
+              : 'border-border-default bg-surface/80 text-muted hover:border-border-emphasis hover:text-primary',
+          ].join(' ')}
+        >
+          <Axis3D size={14} strokeWidth={2.5} />
+          DH Frames
+        </button>
       </div>
 
       {measureActive && <MeasureReadout />}
@@ -115,16 +138,19 @@ function MeasureReadout() {
     const dist = Math.hypot(dx, dy, dz) * 1000
     // Per-axis deltas in the FK/DH frame (mm), so they line up with the DH table.
     const [fdx, fdy, fdz] = fkFromScene(dx, dy, dz)
+    const deltas: Record<'x' | 'y' | 'z', number> = { x: fdx, y: fdy, z: fdz }
     body = (
       <div className="flex flex-col gap-0.5">
         <div className="flex items-baseline justify-between gap-4">
           <span className="text-faint">Distance</span>
           <span className="text-amber tabular-nums">{dist.toFixed(1)} mm</span>
         </div>
-        <div className="text-faint flex justify-between gap-3 tabular-nums">
-          <span>ΔX {fdx.toFixed(1)}</span>
-          <span>ΔY {fdy.toFixed(1)}</span>
-          <span>ΔZ {fdz.toFixed(1)}</span>
+        <div className="flex justify-between gap-3 tabular-nums">
+          {(['x', 'y', 'z'] as const).map((k) => (
+            <span key={k} style={{ color: SCENE_AXIS_COLORS[FK_AXIS_TO_SCENE[k].index] }}>
+              Δ{k.toUpperCase()} {deltas[k].toFixed(1)}
+            </span>
+          ))}
         </div>
         <span className="text-faint text-[9px] uppercase tracking-wide">DH frame · mm</span>
       </div>
@@ -132,7 +158,7 @@ function MeasureReadout() {
   }
 
   return (
-    <div className="pointer-events-auto flex flex-col gap-1 rounded-md border border-border-default bg-surface/90 px-2.5 py-1.5 font-mono text-[11px]">
+    <div className="pointer-events-auto flex flex-col gap-1.5 rounded-md border border-border-default bg-surface/90 px-2.5 py-1.5 font-mono text-[11px]">
       {body}
       <button
         type="button"
