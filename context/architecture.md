@@ -95,14 +95,18 @@ method from `project-overview.md` is an open question, not yet built.
   one is active (`null` = the un-offset identity — tool0 / world base).
 - A `Frame` is `{id, name, offset: Pose}` — mm/deg, relative to its parent
   (tool0 for tool frames, the world base for user frames).
-- The pendant's User tab jogs along the active user frame's axes; Tool jogs
-  along the active tool frame's axes composed with the live wrist
-  orientation — both computed in `pendant/useJog.ts`'s `applyCartesianStep`
-  via `eulerXYZToRot3` + conjugation, not a new IK mode.
-- **Scope limit:** only the frame's *orientation* is applied to jog axes.
-  The *translation* offset (e.g. a gripper's length) does not shift the IK
-  target — jogging still controls the flange/tool0 point, not the registered
-  frame's origin. See `progress-tracker.md`'s Open Questions.
+- **Carried-forward gap:** `useJog.ts` (deleted — see below) was the only
+  place Tool/User Cartesian jogging was frame-aware (jogging along the
+  tool's own axis, composed with the live wrist orientation via
+  `eulerXYZToRot3` + conjugation). `CartesianJog.tsx`'s drag-bar/exact-entry
+  rows solve IK against the world-frame TCP pose regardless of which frame
+  tab is active — switching Tool/User currently only changes the label, not
+  the axis behavior. Re-derive `applyCartesianStep` from git history if true
+  per-frame jogging is wanted back.
+- **Scope limit (independent of the above):** even when frame-aware jogging
+  existed, only the frame's *orientation* was applied to jog axes — the
+  *translation* offset (e.g. a gripper's length) never shifted the IK
+  target. See `progress-tracker.md`'s Open Questions.
 
 ---
 
@@ -148,8 +152,9 @@ export const JOINT_AXES  = ['z','y','y','z','y','z'] as const;
 - `src/frames/` — tool/user frame definitions and registration.
 - `src/online/` — connection panel, driver selection, live jog/monitor wiring, program download.
 - `src/state/` — zustand stores, single-concern: `robotStore` (joint pose),
-  `pendantStore` (jog frame/mode/step/speed), `machineStore` (estop/hold/moving
-  + `deriveStatus`), `settingsStore` (view toggles — TCP trail); program, cell,
+  `pendantStore` (jog frame + speed override — no jog mode/step, see below),
+  `machineStore` (estop/hold/moving + `deriveStatus`), `settingsStore` (view
+  toggles — TCP trail), `measureStore` (two-point scene ruler); program, cell,
   frames, connection stores arrive in their phases.
 - `src/config/` — DH params, limits, node map. Single source of truth. Also
   `glb-joint-map.ts`: model-specific adapter mapping J1..J6 → the current GLB's
@@ -163,10 +168,15 @@ Implemented so far (Phases 1–3): `src/config/{dh-params,glb-joint-map}.ts`,
 `src/state/{robotStore,pendantStore,machineStore,settingsStore}.ts`
 (+ `machineStore.test.ts`), `src/program/{motion.ts (+ motion.test.ts),
 useMotion.ts}`, `src/scene/*` (incl. `TcpTrail`, `ViewportOverlay`),
-`src/ui/{PendantButton,FrameTab,SpeedSlider,JogButton,JointBar,StatusPill}.tsx`,
-`src/pendant/{Pendant,FrameSelector,JogModeSelector,JointJog,CartesianJog,
+`src/ui/{PendantButton,FrameTab,SpeedSlider,JointBar,EditableAngle,StatusPill}.tsx`,
+`src/pendant/{Pendant,FrameSelector,JointJog,CartesianJog,
 SpeedOverride,PoseReadout,KinematicsReadout,GoToPose,SafetyControls,StatusStrip}.tsx`
-+ `useJog.ts` + `jogMath.ts` (+ `jogMath.test.ts`), `src/types.ts`. The full
++ `jogMath.ts` (+ `jogMath.test.ts`), `src/types.ts`. Jog UX is now drag-the-bar
+(`JointBar`, draggable) or click-to-edit-exact-value (`EditableAngle`), both
+an instant set (direct `setAngle`/`setAngles`, or one IK solve) rather than a
+held jog — `JogModeSelector.tsx`, `useJog.ts`, and `ui/JogButton.tsx` were
+removed once nothing else needed continuous/incremental +/- jogging
+(progress-tracker.md has the full removal writeup). The full
 kinematics API (`forwardKinematics`, `inverseKinematics`, `computeJacobian`,
 `manipulability`) now exists. Phase 4 added the full `src/program/` module
 (`instructionModel`, `migrate`, `serialize`, `ProgramEditor`,
@@ -176,13 +186,14 @@ Phase 5 (now complete) added: `src/cell/{cellStore,CellBrowser,cellColors,
 ObjectPropertyPanel}.ts(x)` (placed-object store, Cell Browser tree, type/
 color/transform property panel) + `src/ui/CellTreeNode.tsx`; the full
 `src/cad/` module (`validate`, `loaders`, `geometryCache`, `importCadFile`);
-`src/scene/{CellObjects,CameraRig,sceneFrame,activeCamera,dropToFloor}.tsx/ts`
-(cell-object rendering + the transform gizmo, the camera-view presets, the
-shared FK→scene mapping `TcpTrail` also uses, and the floor raycast behind
-drag-to-place); `src/frames/{framesModel,FramePanel}.ts(x)` +
-`src/state/framesStore.ts` (tool/user frame registration, wired into
-`pendant/useJog.ts`'s Cartesian jog). `src/{robot,online}/` arrive in their
-phases.
+`src/scene/{CellObjects,CameraRig,sceneFrame,activeCamera,dropToFloor,
+MeasureTool}.tsx/ts` (cell-object rendering + the transform gizmo, the
+camera-view presets, the shared FK→scene mapping `TcpTrail` also uses [plus
+its inverse `fkFromScene`, for the measure tool], the floor raycast behind
+drag-to-place, and the two-point measure ruler); `src/frames/
+{framesModel,FramePanel}.ts(x)` + `src/state/framesStore.ts` (tool/user frame
+registration — no longer wired into Cartesian jog axes, see the carried-
+forward gap above). `src/{robot,online}/` arrive in their phases.
 
 **Scene coordinate mapping:** FK works in a Z-up DH base frame; the three.js
 scene is Y-up. FK geometry (TCP marker, trail) is mapped (x,y,z)→(x,z,−y) and

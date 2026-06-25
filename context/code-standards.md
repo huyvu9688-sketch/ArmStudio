@@ -34,7 +34,12 @@
 - One `useFrame` loop drives the arm. No scattered timers.
 - GLB joint rotation comes from `JOINT_AXES` config, never hardcoded per component.
 - Pendant components are presentational: read state, call the active driver. No kinematics inside them.
-- Shared hooks: `useJog()`, `useProgramPlayback()`, `useReachTest()`, `useConnection()`.
+- Jog is drag-the-bar (`JointBar`) or click-to-edit-exact-value
+  (`EditableAngle`) — an instant set (direct `setAngle`/`setAngles`, or one IK
+  solve), not a held jog loop. (`useJog()` existed for continuous/incremental
+  +/- jogging and was removed once nothing else needed it — don't reintroduce
+  it without a reason a drag/edit can't cover.)
+- Shared hooks: `useProgramPlayback()`, `useReachTest()`, `useConnection()`.
 - Wrap the GLB and imported-mesh loaders in Suspense with a fallback. A missing/failed file must surface an error, never crash silently.
 
 ---

@@ -18,6 +18,7 @@ export const SCENE_COLORS = {
   axisZ: '#4a9ee8', // --accent-blue (blue)
   trail: '#f5a623', // --accent-amber (TCP motion trail)
   tcpMarker: '#4a9ee8', // --accent-blue (kinematic TCP point)
+  measure: '#f5a623', // --accent-amber (measure markers + line)
   objPart: '#4a9ee8', // --obj-part
   objFixture: '#8a95a8', // --obj-fixture
   objObstacle: '#f0b429', // --obj-obstacle

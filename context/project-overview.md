@@ -76,7 +76,7 @@ to hardware. Correct robotics behavior and a UI that mirrors real pendants
 
 ### Teach Pendant (Roboguide: Virtual TP)
 - FANUC iPendant-style panel: jog J1–J6 and Cartesian X/Y/Z/Rx/Ry/Rz
-- Frame selector (Joint / World / Tool / User), speed override, jog mode (continuous / incremental)
+- Frame selector (Joint / World / Tool / User), speed override; jog is drag-the-bar or click-to-edit-exact-value (no held/incremental jog mode — see progress-tracker.md)
 - HOLD, E-STOP (red, prominent), HOME
 - Status strip: active frame, speed %, program name, connection state
 

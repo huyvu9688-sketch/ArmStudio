@@ -588,6 +588,73 @@ is next when the user says so.
   the Cartesian jog's IK target, only axis orientation does (see Phase 5
   Unit 6 above and Open Questions below).
 
+- **Measure tool (for the GLB↔DH comparison).** A two-point scene ruler so the
+  GLB's real link lengths can be measured and compared against the locked DH
+  table — the user is preparing a properly-configured GLB and will reconcile
+  the FK model to it. New `src/state/measureStore.ts` (active flag + up to two
+  scene-space points; third click restarts), `src/scene/MeasureTool.tsx`
+  (markers + line, `depthTest:false` so they read through the mesh).
+  `RobotArm.tsx`'s `<primitive>` gained an `onClick` (gated on
+  `measureStore.active`) that records the raycast hit's world point — onClick
+  not onPointerDown so orbiting doesn't drop stray points.
+  `ViewportOverlay.tsx` adds a Measure toggle + a readout showing the
+  straight-line distance (mm) and per-axis ΔX/ΔY/ΔZ in the **FK/DH frame** via
+  new `fkFromScene` (inverse of `sceneFromFk` in `scene/sceneFrame.ts`, tested
+  round-trip). Note: distances are the GLB's own modelled scale (the mesh is
+  added unscaled), which is exactly what's wanted to check against DH a/d —
+  any GLB↔DH discrepancy is the measurement, not an error. `npm run build` +
+  `lint` + `test` (60 tests, +2) pass.
+
+- **Pendant jog UX: drag-bar + exact-entry, no held jog.** Replaced the +/-
+  jog buttons on both the joint grid and the World/Tool/User Cartesian grid
+  with a single combined control per row: `JointBar` (`src/ui/JointBar.tsx`)
+  is now a drag target (press/drag anywhere along it sets the value
+  proportionally to pointer position, with a round thumb at the current
+  value) alongside `EditableAngle`'s click-to-type-exact-value. Both commit
+  *instantly* (direct `setAngle`/`setAngles`, or an IK solve for Cartesian)
+  rather than animating a held jog. This made the Mode section
+  (continuous/incremental + step size) meaningless — incremental specifically
+  only made sense paired with a press-and-release button — so it's gone, and
+  so is everything that only existed to serve it: `JogModeSelector.tsx`,
+  `useJog.ts` (the whole continuous-jog rAF runner, including its frame-aware
+  Cartesian step math for World/Tool/User), `ui/JogButton.tsx`,
+  `jogMath.ts`'s `jogStep`/`jogRateDegPerSec`, and `pendantStore`'s
+  `jogMode`/`stepSize`/`STEP_SIZES`. `pendantStore.speedPct` stayed — it's
+  still read by `useMotion.ts` for recorded MOVJ/MOVL playback speed, unrelated
+  to jogging now. **Known regression carried forward:** the deleted
+  `useJog.ts` was the only place Tool/User Cartesian jogging was actually
+  frame-aware (jogging "along the tool's own Z", conjugating through the
+  registered frame's rotation) — `CartesianJog.tsx`'s new drag/edit rows
+  solve IK against the world-frame TCP pose regardless of which frame tab is
+  active, so Tool/User no longer change *what dragging a row does*, only the
+  label. Revisit if true per-frame jogging is wanted back (re-derive from
+  `applyCartesianStep` in git history rather than `useJog.ts`, which no
+  longer exists). `npm run build` + `lint` + `test` (58 tests, -5 from the
+  removed jogMath functions) pass.
+
+- **Resolved: GLB had no node names.** The `public/models/robot-arm.glb` in
+  use partway through this session had 0/23 named nodes (a re-export had
+  dropped them), so `GLB_JOINT_MAP`'s `Null_3`/`Null_4`/`Null_1`/`Null_6`
+  lookups all failed silently (console warning, joint inert) — and a
+  separate copy had the gripper mesh parented as a sibling of the body
+  instead of nested under a joint, so rotating it visually detached the
+  piece rather than carrying it along (Three.js only cascades a rotation to
+  actual scene-graph children). Built a temporary dev-only "GLB Rig Mapping"
+  panel + a click-to-pick tool (raycast in the viewport → walk up to the
+  nearest named ancestor) to diagnose and patch mappings live without
+  reloading, while tracking down a correctly-named/correctly-nested copy of
+  the source model (`Null→Null_2→Null_3→Null_4→Null_1→Null_6`, matching the
+  original Unit 6 investigation). Once the correct `.glb` was back in place,
+  the override tooling was removed again (`src/pendant/GlbRigPanel.tsx`,
+  `src/state/glbJointMapStore.ts`, the `glb-joint-map.ts` override builder,
+  and the click-to-pick wiring in `RobotArm.tsx`/`CameraRig.tsx`/
+  `JointJog.tsx`) — `glb-joint-map.ts` and `RobotArm.tsx` are back to their
+  original Unit 6 form. **Takeaway carried forward:** the correct rigged
+  `.glb` must ship in `public/models/` before relying on `GLB_JOINT_MAP`'s
+  node names; there's no in-app recovery if the file's names/hierarchy
+  drift again short of re-adding this same tooling. `npm run build` + `lint`
+  + `test` (63 tests) pass.
+
 ---
 
 ## Phase Plan

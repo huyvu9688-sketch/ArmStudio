@@ -140,28 +140,36 @@ Program: pick_place_v1   [Save][Load][.tp]
 ## Component Library
 
 Tailwind + bespoke primitives in `src/ui/`:
-`JogButton`, `FrameTab`, `SpeedSlider`, `JointBar`, `PoseReadout`, `StatusPill`,
+`JointBar`, `EditableAngle`, `FrameTab`, `SpeedSlider`, `PoseReadout`, `StatusPill`,
 `ConnectionPill`, `PendantButton`, `InstructionRow`, `CellTreeNode`, `ObjectPropertyPanel`.
 
 Icons: `lucide-react`, stroke-based, 16px inline / 20px buttons.
 
-**Built so far (Phase 2):** the real `src/ui/` primitives now exist —
-`PendantButton` (variants default/amber/danger/ready + `active` toggle fill),
-`FrameTab` (segmented tab, disabled state), `SpeedSlider`, `JogButton`
-(hold-to-jog +/-), `JointBar` (limit bar, red near a hard stop), `StatusPill`
-(dot + label, tone + optional pulse). `ConnectionPill` is deferred to Phase 7 —
-the status strip uses `StatusPill` with the `offline` tone meanwhile.
+**Built so far (Phase 2, revised later in Phase 3+):** the real `src/ui/`
+primitives now exist — `PendantButton` (variants default/amber/danger/ready +
+`active` toggle fill), `FrameTab` (segmented tab, disabled state),
+`SpeedSlider`, `JointBar` (draggable limit/value bar — press or drag anywhere
+along it to set the value proportionally, with a round thumb at the current
+value; red near a hard stop, suppressible via `limitWarning={false}` when the
+range is a display window rather than a real travel limit), `EditableAngle`
+(click a numeric readout to type an exact value), `StatusPill` (dot + label,
+tone + optional pulse). `ConnectionPill` is deferred to Phase 7 — the status
+strip uses `StatusPill` with the `offline` tone meanwhile. (The original
+`JogButton` hold-to-jog +/- pair and the Cont/Incr mode selector were replaced
+by the drag-bar/exact-entry pair and removed — see progress-tracker.md.)
 
 The full teach pendant is composed in `src/pendant/`: `Pendant` (panel),
-`FrameSelector`, `JogModeSelector` (Cont/Incr + step chips), `JointJog` (+/- jog
-grid, replacing the Phase-1 sliders), `SpeedOverride`, `PoseReadout`,
-`SafetyControls` (TEACH/HOME/HOLD + latched E-STOP). The top status strip is now
+`FrameSelector`, `JointJog` (drag-bar + exact-entry per joint, replacing the
+Phase-1 sliders and the later +/- buttons), `CartesianJog` (same pattern for
+World/Tool/User, X/Y/Z/Rx/Ry/Rz via IK), `SpeedOverride`, `PoseReadout`,
+`SafetyControls` (TEACH/HOME/HOLD + latched E-STOP). The top status strip is
 live in `src/pendant/StatusStrip.tsx` (extracted from `App.tsx`), reflecting
 frame / speed / robot status from the pendant + machine stores.
 
-Pendant section order matches the layout above: Frame → Mode/Step → Joint jog
-(with limit bars merged into each row) → Speed → TCP pose → safety. `PoseReadout`
-remains in `src/pendant/`.
+Pendant section order matches the layout above, minus the Mode/Step row (removed):
+Frame → Joint/Cartesian jog (drag-bar + exact-entry per row, limit bars merged
+into each row) → Speed → TCP pose → safety. `PoseReadout` remains in
+`src/pendant/`.
 
 **Added in Phase 3:** the Frame selector now enables Joint/World/Tool (User stays
 disabled until Phase 5). When World/Tool is active the pendant swaps the joint

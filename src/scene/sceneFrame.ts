@@ -1,4 +1,4 @@
-import { mm2m } from '../kinematics/units'
+import { m2mm, mm2m } from '../kinematics/units'
 
 /**
  * FK→scene frame mapping — shared by `TcpTrail` and `CameraRig` (Phase 5 ·
@@ -8,4 +8,13 @@ import { mm2m } from '../kinematics/units'
  */
 export function sceneFromFk(xMm: number, yMm: number, zMm: number): [number, number, number] {
   return [mm2m(xMm), mm2m(zMm), mm2m(-yMm)]
+}
+
+/**
+ * Inverse of `sceneFromFk`: scene point (m, Y-up) → FK-frame mm (Z-up). Lets
+ * the measure tool report axis deltas in the same frame as the DH table, so a
+ * caliper-style measurement of the GLB lines up with the locked DH a/d values.
+ */
+export function fkFromScene(xM: number, yM: number, zM: number): [number, number, number] {
+  return [m2mm(xM), m2mm(-zM), m2mm(yM)]
 }

@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { GLB_JOINT_MAP } from '../config/glb-joint-map'
+import { useMeasureStore } from '../state/measureStore'
 import { useRobotStore } from '../state/robotStore'
 import { deg2rad } from '../kinematics/units'
 import type { JointAxis } from '../types'
@@ -93,7 +94,19 @@ export function RobotArm() {
     }
   })
 
-  return <primitive object={model} />
+  // Measure tool: while armed, a click on the mesh records the raycast hit's
+  // world-space point (scene metres) as a ruler endpoint. onClick (not
+  // pointerdown) so dragging to orbit doesn't drop a stray point.
+  const measureActive = useMeasureStore((s) => s.active)
+  const addMeasurePoint = useMeasureStore((s) => s.addPoint)
+
+  function onModelClick(e: ThreeEvent<MouseEvent>) {
+    if (!measureActive) return
+    e.stopPropagation()
+    addMeasurePoint([e.point.x, e.point.y, e.point.z])
+  }
+
+  return <primitive object={model} onClick={onModelClick} />
 }
 
 useGLTF.preload(ARM_GLB_URL)

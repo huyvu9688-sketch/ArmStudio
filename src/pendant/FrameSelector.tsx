@@ -4,9 +4,10 @@ import { FrameTab } from '../ui/FrameTab'
 /**
  * Frame selector — Phase 2 · Unit 3, User enabled in Phase 5 · Unit 6.
  *
- * Picks the jog reference frame. Joint/World/Tool jog by solving IK live
- * (Phase 3); User jogs along the active registered user frame's axes
- * (`useJog.ts`, `framesStore`) — register one in the Frames panel.
+ * Picks the jog reference frame. Joint/World/Tool/User all edit the TCP
+ * pose via IK (`CartesianJog`'s drag-bar/exact-entry rows); User additionally
+ * needs an active registered frame (`framesStore`) — register one in the
+ * Frames panel.
  */
 const FRAMES: { id: JogFrame; label: string }[] = [
   { id: 'joint', label: 'Joint' },

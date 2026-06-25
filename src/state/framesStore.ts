@@ -7,8 +7,7 @@ import type { Frame, Pose } from '../types'
  *
  * Registered tool and user frames plus which one is active. `null` active id
  * means the un-offset default (tool0 for tools, the world base for users) —
- * no seed frame needed, matching the zero-offset identity. `useJog.ts` reads
- * the active frame's offset to orient Cartesian jog axes; `FrameSelector`
+ * no seed frame needed, matching the zero-offset identity. `FrameSelector`
  * reads it to enable the User tab.
  */
 interface FramesStore {

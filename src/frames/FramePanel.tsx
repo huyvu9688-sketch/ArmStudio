@@ -9,8 +9,8 @@ import type { Frame, Pose } from '../types'
  *
  * Direct-entry registration only (project-overview.md's 3-point method is a
  * documented gap — progress-tracker.md). Each list lets you name a frame, pick
- * it active (drives the Tool/User Cartesian jog axes in `useJog.ts`), edit its
- * offset (mm/deg, relative to tool0 for tools / world for users), or delete it.
+ * it active, edit its offset (mm/deg, relative to tool0 for tools / world for
+ * users), or delete it.
  */
 const POSE_FIELDS: { key: keyof Pose; label: string; unit: string }[] = [
   { key: 'x', label: 'X', unit: 'mm' },
